@@ -1,3 +1,4 @@
 node_modules/
-coupons.db
 *.db
+*.db-shm
+*.db-wal
