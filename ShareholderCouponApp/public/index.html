@@ -24,6 +24,46 @@
     }
     header h1 { font-size: 1.25rem; font-weight: 700; }
     header span { font-size: 1.5rem; }
+    .header-btn {
+      background: rgba(255,255,255,.15);
+      border: none;
+      color: white;
+      border-radius: 8px;
+      width: 36px;
+      height: 36px;
+      font-size: 1.1rem;
+      cursor: pointer;
+      transition: background .15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .header-btn:hover { background: rgba(255,255,255,.25); }
+
+    /* ヘルプモーダル */
+    .help-modal .modal { max-width: 600px; max-height: 80vh; overflow-y: auto; }
+    .help-section { margin-bottom: 22px; }
+    .help-section h3 {
+      font-size: .95rem;
+      color: #1a3a5c;
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #bee3f8;
+    }
+    .help-section p, .help-section li {
+      font-size: .875rem;
+      color: #4a5568;
+      line-height: 1.7;
+    }
+    .help-section ul { padding-left: 18px; }
+    .help-section li { margin-bottom: 4px; }
+    .status-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    .status-table th, .status-table td {
+      text-align: left;
+      padding: 7px 10px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .status-table th { background: #f7fafc; font-weight: 600; color: #4a5568; }
 
     .container { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
 
@@ -342,6 +382,10 @@
 <header>
   <span>📊</span>
   <h1>株主優待 URL管理</h1>
+  <div style="margin-left:auto;display:flex;gap:8px;">
+    <button class="header-btn" id="helpBtn" title="使い方">？</button>
+    <button class="header-btn" id="logoutBtn" title="ログアウト">⏻</button>
+  </div>
 </header>
 
 <div class="container">
@@ -412,6 +456,68 @@
       <button class="btn-cancel" id="urlModalClose">閉じる</button>
       <button class="btn-copy" id="urlModalCopy">コピー</button>
       <a class="btn-open" id="urlModalOpen" href="#" target="_blank" rel="noopener">ブラウザで開く</a>
+    </div>
+  </div>
+</div>
+
+<!-- ヘルプモーダル -->
+<div class="modal-overlay help-modal" id="helpModal">
+  <div class="modal">
+    <h2>使い方ガイド</h2>
+
+    <div class="help-section">
+      <h3>📋 このアプリについて</h3>
+      <p>株主優待として発行されるURLクーポンを一元管理するアプリです。株主サイトで発行したURLを登録し、有効期限や使用状況をまとめて確認できます。</p>
+    </div>
+
+    <div class="help-section">
+      <h3>➕ 優待の登録方法</h3>
+      <ul>
+        <li>株主サイトにログインし、株主優待のURLを発行します（この操作はお客様が手動で行います）</li>
+        <li>「＋ 優待を追加」ボタンをタップします</li>
+        <li>会社名・優待内容・発行されたURL・有効期限を入力します</li>
+        <li>株主番号・証券コード・メモは任意で入力できます</li>
+        <li>「保存」で登録完了です</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <h3>🏷️ ステータスの見方</h3>
+      <table class="status-table">
+        <thead>
+          <tr><th>ステータス</th><th>意味</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span class="badge badge-active">有効</span></td><td>有効期限内・未使用</td></tr>
+          <tr><td><span class="badge badge-expiring">期限間近</span></td><td>有効期限まで14日以内</td></tr>
+          <tr><td><span class="badge badge-expired">期限切れ</span></td><td>有効期限を過ぎたもの</td></tr>
+          <tr><td><span class="badge badge-used">使用済み</span></td><td>使用済みとしてマークされたもの</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="help-section">
+      <h3>🔗 URLの使い方</h3>
+      <ul>
+        <li>カードのURL部分をタップするとURLが表示されます</li>
+        <li>「ブラウザで開く」で直接アクセスできます</li>
+        <li>「コピー」でURLをクリップボードにコピーできます</li>
+        <li>使用後は「使用済みにする」ボタンをタップして管理しましょう</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <h3>🔐 パスキー認証について</h3>
+      <ul>
+        <li>このアプリはパスキー（生体認証）でログインします</li>
+        <li>指紋認証・顔認証などデバイスの認証機能を使用します</li>
+        <li>パスワードは不要です</li>
+        <li>別のデバイスで使う場合は、そのデバイスでログインページから「新しいパスキーを追加」してください</li>
+      </ul>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" id="helpClose">閉じる</button>
     </div>
   </div>
 </div>
@@ -666,7 +772,34 @@
     setTimeout(() => t.classList.remove('show'), 2500);
   }
 
-  loadCoupons();
+  // 認証チェック
+  async function checkAuth() {
+    const res = await fetch('/api/auth/status');
+    if (!res.ok || !(await res.json()).authenticated) {
+      window.location.href = '/login';
+    }
+  }
+
+  // ヘルプモーダル
+  document.getElementById('helpBtn').addEventListener('click', () => {
+    document.getElementById('helpModal').classList.add('open');
+  });
+  document.getElementById('helpClose').addEventListener('click', () => {
+    document.getElementById('helpModal').classList.remove('open');
+  });
+  document.getElementById('helpModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('helpModal'))
+      document.getElementById('helpModal').classList.remove('open');
+  });
+
+  // ログアウト
+  document.getElementById('logoutBtn').addEventListener('click', async () => {
+    if (!confirm('ログアウトしますか？')) return;
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.href = '/login';
+  });
+
+  checkAuth().then(() => loadCoupons());
 </script>
 </body>
 </html>

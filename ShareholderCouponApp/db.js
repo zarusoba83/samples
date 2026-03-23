@@ -21,9 +21,19 @@ db.exec(`
   )
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS credentials (
+    id          TEXT    PRIMARY KEY,
+    public_key  TEXT    NOT NULL,
+    counter     INTEGER DEFAULT 0,
+    transports  TEXT    DEFAULT '[]',
+    created_at  TEXT    DEFAULT (datetime('now', 'localtime'))
+  )
+`);
+
 // 既存DBへのカラム追加（マイグレーション）
 const cols = db.pragma('table_info(coupons)').map(c => c.name);
 if (!cols.includes('shareholder_number')) db.exec("ALTER TABLE coupons ADD COLUMN shareholder_number TEXT DEFAULT ''");
-if (!cols.includes('securities_code'))    db.exec("ALTER TABLE coupons ADD COLUMN securities_code TEXT DEFAULT ''")
+if (!cols.includes('securities_code'))    db.exec("ALTER TABLE coupons ADD COLUMN securities_code TEXT DEFAULT ''");
 
 module.exports = db;

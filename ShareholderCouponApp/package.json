@@ -8,7 +8,11 @@
     "dev": "npx nodemon server.js"
   },
   "dependencies": {
+    "@simplewebauthn/browser": "^10.0.0",
+    "@simplewebauthn/server": "^10.0.0",
     "better-sqlite3": "^9.4.3",
-    "express": "^4.18.2"
+    "connect-sqlite3": "^0.9.13",
+    "express": "^4.18.2",
+    "express-session": "^1.17.3"
   }
 }
