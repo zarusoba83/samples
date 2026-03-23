@@ -18,14 +18,14 @@ app.get('/api/coupons', (req, res) => {
 
 // 登録
 app.post('/api/coupons', (req, res) => {
-  const { company, description, url, expires_at, note } = req.body;
+  const { company, description, url, expires_at, note, shareholder_number, securities_code } = req.body;
   if (!company || !description || !url || !expires_at) {
     return res.status(400).json({ error: '必須項目が不足しています' });
   }
   const result = db.prepare(`
-    INSERT INTO coupons (company, description, url, expires_at, note)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(company, description, url, expires_at, note || '');
+    INSERT INTO coupons (company, description, url, expires_at, note, shareholder_number, securities_code)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(company, description, url, expires_at, note || '', shareholder_number || '', securities_code || '');
   const coupon = db.prepare('SELECT * FROM coupons WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(coupon);
 });
@@ -52,13 +52,13 @@ app.delete('/api/coupons/:id', (req, res) => {
 
 // 編集
 app.put('/api/coupons/:id', (req, res) => {
-  const { company, description, url, expires_at, note } = req.body;
+  const { company, description, url, expires_at, note, shareholder_number, securities_code } = req.body;
   if (!company || !description || !url || !expires_at) {
     return res.status(400).json({ error: '必須項目が不足しています' });
   }
   db.prepare(`
-    UPDATE coupons SET company=?, description=?, url=?, expires_at=?, note=? WHERE id=?
-  `).run(company, description, url, expires_at, note || '', req.params.id);
+    UPDATE coupons SET company=?, description=?, url=?, expires_at=?, note=?, shareholder_number=?, securities_code=? WHERE id=?
+  `).run(company, description, url, expires_at, note || '', shareholder_number || '', securities_code || '', req.params.id);
   res.json(db.prepare('SELECT * FROM coupons WHERE id = ?').get(req.params.id));
 });
 

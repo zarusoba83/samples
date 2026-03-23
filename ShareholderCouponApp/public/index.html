@@ -382,6 +382,16 @@
       <label>有効期限 <span class="required">*</span></label>
       <input type="date" id="fieldExpires">
     </div>
+    <div class="form-group" style="display:flex;gap:12px;">
+      <div style="flex:1;">
+        <label>株主番号</label>
+        <input type="text" id="fieldShareholderNumber" placeholder="例: 123456">
+      </div>
+      <div style="flex:1;">
+        <label>証券コード</label>
+        <input type="text" id="fieldSecuritiesCode" placeholder="例: 7203">
+      </div>
+    </div>
     <div class="form-group">
       <label>メモ</label>
       <input type="text" id="fieldNote" placeholder="例: ECサイト限定、5,000円以上で使用可">
@@ -481,12 +491,16 @@
       const usedBtnCls = c.used ? 'btn-use active' : 'btn-use';
       const urlShort = c.url.length > 60 ? c.url.slice(0, 60) + '…' : c.url;
       const noteHtml = c.note ? `<div class="note-text">📝 ${escHtml(c.note)}</div>` : '';
+      const subMeta = [
+        c.shareholder_number ? `<span><strong>株主番号：</strong>${escHtml(c.shareholder_number)}</span>` : '',
+        c.securities_code    ? `<span><strong>証券コード：</strong>${escHtml(c.securities_code)}</span>` : '',
+      ].filter(Boolean).join('');
 
       return `
         <div class="coupon-card ${cls}" data-id="${c.id}">
           <div class="card-header">
             <div class="card-title">
-              <span class="company-name">${escHtml(c.company)}</span>
+              <span class="company-name">${escHtml(c.company)}${c.securities_code ? ` <span style="font-size:.8rem;font-weight:400;color:#718096;">(${escHtml(c.securities_code)})</span>` : ''}</span>
               <span class="benefit-desc">${escHtml(c.description)}</span>
             </div>
             ${badgeHtml(status)}
@@ -499,6 +513,7 @@
             <div class="meta-row">
               <span><strong>有効期限：</strong>${expiresLabel(c)}</span>
               ${c.used && c.used_at ? `<span><strong>使用日：</strong>${fmtDate(c.used_at.slice(0,10))}</span>` : ''}
+              ${subMeta}
             </div>
             ${noteHtml}
           </div>
@@ -552,6 +567,8 @@
     document.getElementById('fieldDescription').value = '';
     document.getElementById('fieldUrl').value = '';
     document.getElementById('fieldExpires').value = '';
+    document.getElementById('fieldShareholderNumber').value = '';
+    document.getElementById('fieldSecuritiesCode').value = '';
     document.getElementById('fieldNote').value = '';
     document.getElementById('formModal').classList.add('open');
   });
@@ -571,6 +588,8 @@
       description: document.getElementById('fieldDescription').value.trim(),
       url: document.getElementById('fieldUrl').value.trim(),
       expires_at: document.getElementById('fieldExpires').value,
+      shareholder_number: document.getElementById('fieldShareholderNumber').value.trim(),
+      securities_code: document.getElementById('fieldSecuritiesCode').value.trim(),
       note: document.getElementById('fieldNote').value.trim(),
     };
     if (!body.company || !body.description || !body.url || !body.expires_at) {
@@ -599,6 +618,8 @@
     document.getElementById('fieldDescription').value = c.description;
     document.getElementById('fieldUrl').value = c.url;
     document.getElementById('fieldExpires').value = c.expires_at;
+    document.getElementById('fieldShareholderNumber').value = c.shareholder_number || '';
+    document.getElementById('fieldSecuritiesCode').value = c.securities_code || '';
     document.getElementById('fieldNote').value = c.note || '';
     document.getElementById('formModal').classList.add('open');
   }
