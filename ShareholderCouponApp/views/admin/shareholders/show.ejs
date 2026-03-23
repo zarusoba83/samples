@@ -1,0 +1,82 @@
+<%
+  title = shareholder.name;
+  currentPage = 'shareholders';
+%>
+<%- include('../../partials/admin_header') %>
+
+<div class="d-flex align-items-center mb-3">
+  <a href="/admin/shareholders" class="btn btn-sm btn-outline-secondary me-2">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <h4 class="mb-0"><i class="bi bi-person"></i> <%= shareholder.name %></h4>
+  <a href="/admin/shareholders/<%= shareholder.id %>/edit" class="btn btn-sm btn-outline-warning ms-2">
+    <i class="bi bi-pencil"></i> 編集
+  </a>
+  <form method="POST" action="/admin/shareholders/<%= shareholder.id %>/delete" class="ms-2"
+        onsubmit="return confirm('この株主を削除しますか？関連するクーポンも削除されます。')">
+    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> 削除</button>
+  </form>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header">基本情報</div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-5">株主番号</dt>
+          <dd class="col-7"><code><%= shareholder.shareholder_number %></code></dd>
+          <dt class="col-5">氏名</dt>
+          <dd class="col-7"><%= shareholder.name %></dd>
+          <dt class="col-5">メール</dt>
+          <dd class="col-7"><%= shareholder.email || '-' %></dd>
+          <dt class="col-5">保有株数</dt>
+          <dd class="col-7"><%= shareholder.shares_count.toLocaleString() %>株</dd>
+          <dt class="col-5">登録日</dt>
+          <dd class="col-7"><%= shareholder.created_at.substring(0, 10) %></dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h5><i class="bi bi-ticket-perforated"></i> 発行済みクーポン (<%= shareholder.coupons.length %>件)</h5>
+<% if (shareholder.coupons.length === 0) { %>
+  <p class="text-muted">クーポンはまだ発行されていません</p>
+<% } else { %>
+  <div class="card">
+    <div class="card-body p-0">
+      <table class="table table-sm mb-0">
+        <thead class="table-light">
+          <tr><th>キャンペーン</th><th>クーポンコード</th><th>ステータス</th><th>発行URL</th><th>使用日時</th></tr>
+        </thead>
+        <tbody>
+          <% shareholder.coupons.forEach(c => { %>
+            <tr>
+              <td><%= c.campaign_name %></td>
+              <td><code><%= c.coupon_code %></code></td>
+              <td>
+                <% if (c.status === 'unused') { %>
+                  <span class="badge badge-unused">未使用</span>
+                <% } else { %>
+                  <span class="badge badge-used">使用済み</span>
+                <% } %>
+              </td>
+              <td>
+                <small>
+                  <a href="<%= baseUrl %>/coupon/<%= c.access_token %>" target="_blank"
+                     class="text-truncate d-inline-block" style="max-width:200px">
+                    /coupon/<%= c.access_token.substring(0, 12) %>...
+                  </a>
+                </small>
+              </td>
+              <td><small><%= c.used_at || '-' %></small></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% } %>
+
+<%- include('../../partials/admin_footer') %>

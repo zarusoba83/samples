@@ -1,0 +1,60 @@
+/* 管理画面ナビ */
+.sidebar {
+  min-height: 100vh;
+  background-color: #1a3a5c;
+}
+.sidebar .nav-link {
+  color: rgba(255, 255, 255, 0.75);
+  padding: 0.6rem 1rem;
+}
+.sidebar .nav-link:hover,
+.sidebar .nav-link.active {
+  color: #fff;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+.sidebar .brand {
+  color: #fff;
+  font-weight: bold;
+  font-size: 1rem;
+  padding: 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.2);
+}
+
+/* ステータスバッジ */
+.badge-unused { background-color: #198754; }
+.badge-used { background-color: #6c757d; }
+.badge-expired { background-color: #dc3545; }
+.badge-not_yet { background-color: #ffc107; color: #000; }
+
+/* クーポンカード (公開ページ) */
+.coupon-card {
+  border: 3px dashed #1a3a5c;
+  border-radius: 12px;
+  padding: 2rem;
+  max-width: 480px;
+  margin: 0 auto;
+}
+.coupon-code {
+  font-size: 2rem;
+  font-weight: bold;
+  letter-spacing: 0.2em;
+  color: #1a3a5c;
+  font-family: monospace;
+}
+.coupon-discount {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: #dc3545;
+}
+
+/* ダッシュボード統計カード */
+.stat-card {
+  border-radius: 10px;
+  padding: 1.2rem;
+  text-align: center;
+}
+.stat-value {
+  font-size: 2.5rem;
+  font-weight: bold;
+}
