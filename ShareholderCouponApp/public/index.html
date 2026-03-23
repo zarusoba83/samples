@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>株主優待 URL管理</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Hiragino Sans', 'Meiryo', sans-serif;
+      background: #f4f6f9;
+      color: #333;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #1a3a5c;
+      color: white;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { font-size: 1.25rem; font-weight: 700; }
+    header span { font-size: 1.5rem; }
+
+    .container { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
+
+    /* サマリーバー */
+    .summary {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .summary-card {
+      background: white;
+      border-radius: 10px;
+      padding: 14px 20px;
+      flex: 1;
+      min-width: 120px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      text-align: center;
+    }
+    .summary-card .num { font-size: 2rem; font-weight: 700; }
+    .summary-card .label { font-size: .75rem; color: #777; margin-top: 2px; }
+    .summary-card.danger .num { color: #e53e3e; }
+    .summary-card.warning .num { color: #d97706; }
+    .summary-card.success .num { color: #38a169; }
+
+    /* フィルタ */
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .filter-btn {
+      padding: 6px 16px;
+      border-radius: 20px;
+      border: 1.5px solid #cbd5e0;
+      background: white;
+      cursor: pointer;
+      font-size: .875rem;
+      transition: all .15s;
+    }
+    .filter-btn.active, .filter-btn:hover {
+      background: #1a3a5c;
+      color: white;
+      border-color: #1a3a5c;
+    }
+    .add-btn {
+      margin-left: auto;
+      padding: 8px 20px;
+      background: #2b6cb0;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: .875rem;
+      font-weight: 600;
+      transition: background .15s;
+    }
+    .add-btn:hover { background: #2c5282; }
+
+    /* カードリスト */
+    .card-list { display: flex; flex-direction: column; gap: 12px; }
+
+    .coupon-card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      padding: 18px 20px;
+      border-left: 5px solid #2b6cb0;
+      transition: box-shadow .15s;
+    }
+    .coupon-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+    .coupon-card.expiring-soon { border-left-color: #d97706; background: #fffbeb; }
+    .coupon-card.expired { border-left-color: #a0aec0; opacity: .7; }
+    .coupon-card.used { border-left-color: #68d391; background: #f0fff4; }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .card-title {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .company-name {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #1a3a5c;
+    }
+    .benefit-desc {
+      font-size: .875rem;
+      color: #555;
+    }
+
+    .badge {
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: .75rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .badge-active    { background: #bee3f8; color: #2b6cb0; }
+    .badge-expiring  { background: #fef3c7; color: #b45309; }
+    .badge-expired   { background: #e2e8f0; color: #718096; }
+    .badge-used      { background: #c6f6d5; color: #276749; }
+
+    .card-body {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .url-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #f7fafc;
+      border-radius: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .url-row:hover { background: #ebf4ff; }
+    .url-text {
+      font-size: .8rem;
+      color: #2b6cb0;
+      word-break: break-all;
+      flex: 1;
+      text-decoration: underline;
+    }
+    .copy-hint {
+      font-size: .7rem;
+      color: #a0aec0;
+      white-space: nowrap;
+    }
+
+    .meta-row {
+      display: flex;
+      gap: 16px;
+      font-size: .8rem;
+      color: #718096;
+      flex-wrap: wrap;
+    }
+    .meta-row strong { color: #4a5568; }
+
+    .expires-warning { color: #b45309; font-weight: 600; }
+    .expires-expired { color: #e53e3e; font-weight: 600; }
+
+    .card-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #edf2f7;
+      flex-wrap: wrap;
+    }
+    .btn-sm {
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1.5px solid;
+      cursor: pointer;
+      font-size: .8rem;
+      transition: all .15s;
+    }
+    .btn-use   { border-color: #38a169; color: #38a169; background: white; }
+    .btn-use:hover { background: #38a169; color: white; }
+    .btn-use.active { background: #38a169; color: white; }
+    .btn-edit  { border-color: #4a90d9; color: #4a90d9; background: white; }
+    .btn-edit:hover { background: #ebf4ff; }
+    .btn-del   { border-color: #e53e3e; color: #e53e3e; background: white; }
+    .btn-del:hover { background: #fff5f5; }
+
+    .note-text {
+      font-size: .8rem;
+      color: #718096;
+      font-style: italic;
+    }
+
+    /* モーダル */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.5);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: white;
+      border-radius: 14px;
+      padding: 28px;
+      width: 100%;
+      max-width: 520px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.3);
+    }
+    .modal h2 { font-size: 1.1rem; margin-bottom: 20px; color: #1a3a5c; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block;
+      font-size: .825rem;
+      font-weight: 600;
+      margin-bottom: 5px;
+      color: #4a5568;
+    }
+    .form-group label .required { color: #e53e3e; margin-left: 3px; }
+    .form-group input, .form-group textarea {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1.5px solid #cbd5e0;
+      border-radius: 8px;
+      font-size: .875rem;
+      font-family: inherit;
+      transition: border-color .15s;
+    }
+    .form-group input:focus, .form-group textarea:focus {
+      outline: none;
+      border-color: #2b6cb0;
+    }
+    .form-group textarea { resize: vertical; min-height: 70px; }
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 22px;
+    }
+    .btn-cancel {
+      padding: 9px 20px;
+      background: #edf2f7;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: .875rem;
+    }
+    .btn-save {
+      padding: 9px 24px;
+      background: #2b6cb0;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: .875rem;
+      font-weight: 600;
+    }
+    .btn-save:hover { background: #2c5282; }
+
+    /* URLコピー通知 */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(60px);
+      background: #2d3748;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: .875rem;
+      transition: transform .3s;
+      z-index: 200;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #a0aec0;
+    }
+    .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+    .empty-state p { font-size: .95rem; }
+
+    /* URLダイアログ */
+    .url-modal .url-display {
+      background: #f7fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 16px;
+      word-break: break-all;
+      font-size: .875rem;
+      color: #2b6cb0;
+      margin: 16px 0;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .url-modal .btn-open {
+      padding: 9px 20px;
+      background: #2b6cb0;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: .875rem;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .url-modal .btn-copy {
+      padding: 9px 20px;
+      background: #edf2f7;
+      color: #4a5568;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: .875rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span>📊</span>
+  <h1>株主優待 URL管理</h1>
+</header>
+
+<div class="container">
+  <!-- サマリー -->
+  <div class="summary" id="summary"></div>
+
+  <!-- ツールバー -->
+  <div class="toolbar">
+    <button class="filter-btn active" data-filter="all">すべて</button>
+    <button class="filter-btn" data-filter="active">有効</button>
+    <button class="filter-btn" data-filter="expiring">期限間近</button>
+    <button class="filter-btn" data-filter="expired">期限切れ</button>
+    <button class="filter-btn" data-filter="used">使用済み</button>
+    <button class="add-btn" id="addBtn">＋ 優待を追加</button>
+  </div>
+
+  <!-- カードリスト -->
+  <div class="card-list" id="cardList"></div>
+</div>
+
+<!-- 登録/編集モーダル -->
+<div class="modal-overlay" id="formModal">
+  <div class="modal">
+    <h2 id="formTitle">株主優待を追加</h2>
+    <div class="form-group">
+      <label>会社名 <span class="required">*</span></label>
+      <input type="text" id="fieldCompany" placeholder="例: ○○株式会社">
+    </div>
+    <div class="form-group">
+      <label>優待内容 <span class="required">*</span></label>
+      <input type="text" id="fieldDescription" placeholder="例: オンラインショップ 1,000円割引クーポン">
+    </div>
+    <div class="form-group">
+      <label>優待URL <span class="required">*</span></label>
+      <textarea id="fieldUrl" placeholder="株主サイトで発行されたURLを貼り付けてください"></textarea>
+    </div>
+    <div class="form-group">
+      <label>有効期限 <span class="required">*</span></label>
+      <input type="date" id="fieldExpires">
+    </div>
+    <div class="form-group">
+      <label>メモ</label>
+      <input type="text" id="fieldNote" placeholder="例: ECサイト限定、5,000円以上で使用可">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="cancelBtn">キャンセル</button>
+      <button class="btn-save" id="saveBtn">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- URL表示モーダル -->
+<div class="modal-overlay url-modal" id="urlModal">
+  <div class="modal">
+    <h2 id="urlModalTitle">優待URL</h2>
+    <div class="url-display" id="urlModalContent"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="urlModalClose">閉じる</button>
+      <button class="btn-copy" id="urlModalCopy">コピー</button>
+      <a class="btn-open" id="urlModalOpen" href="#" target="_blank" rel="noopener">ブラウザで開く</a>
+    </div>
+  </div>
+</div>
+
+<!-- トースト通知 -->
+<div class="toast" id="toast"></div>
+
+<script>
+  let coupons = [];
+  let currentFilter = 'all';
+  let editingId = null;
+
+  const WARN_DAYS = 14; // 14日以内は「期限間近」
+
+  function daysDiff(dateStr) {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const exp = new Date(dateStr);
+    exp.setHours(0, 0, 0, 0);
+    return Math.floor((exp - now) / 86400000);
+  }
+
+  function getStatus(c) {
+    if (c.used) return 'used';
+    const d = daysDiff(c.expires_at);
+    if (d < 0) return 'expired';
+    if (d <= WARN_DAYS) return 'expiring';
+    return 'active';
+  }
+
+  function fmtDate(dateStr) {
+    const [y, m, d] = dateStr.split('-');
+    return `${y}年${parseInt(m)}月${parseInt(d)}日`;
+  }
+
+  function expiresLabel(c) {
+    if (c.used) return '';
+    const d = daysDiff(c.expires_at);
+    if (d < 0) return `<span class="expires-expired">期限切れ (${fmtDate(c.expires_at)})</span>`;
+    if (d === 0) return `<span class="expires-warning">本日期限！</span>`;
+    if (d <= WARN_DAYS) return `<span class="expires-warning">残り${d}日 (${fmtDate(c.expires_at)})</span>`;
+    return `${fmtDate(c.expires_at)}`;
+  }
+
+  function badgeHtml(status) {
+    const map = {
+      active:   ['badge-active',   '有効'],
+      expiring: ['badge-expiring', '期限間近'],
+      expired:  ['badge-expired',  '期限切れ'],
+      used:     ['badge-used',     '使用済み'],
+    };
+    const [cls, text] = map[status];
+    return `<span class="badge ${cls}">${text}</span>`;
+  }
+
+  function renderCards() {
+    const list = document.getElementById('cardList');
+    const filtered = coupons.filter(c => {
+      const s = getStatus(c);
+      if (currentFilter === 'all') return true;
+      return s === currentFilter;
+    });
+
+    if (filtered.length === 0) {
+      list.innerHTML = `
+        <div class="empty-state">
+          <div class="icon">📋</div>
+          <p>該当する優待がありません</p>
+        </div>`;
+      return;
+    }
+
+    list.innerHTML = filtered.map(c => {
+      const status = getStatus(c);
+      const cls = status === 'active' ? '' : status;
+      const usedBtnText = c.used ? '使用済み取消' : '使用済みにする';
+      const usedBtnCls = c.used ? 'btn-use active' : 'btn-use';
+      const urlShort = c.url.length > 60 ? c.url.slice(0, 60) + '…' : c.url;
+      const noteHtml = c.note ? `<div class="note-text">📝 ${escHtml(c.note)}</div>` : '';
+
+      return `
+        <div class="coupon-card ${cls}" data-id="${c.id}">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="company-name">${escHtml(c.company)}</span>
+              <span class="benefit-desc">${escHtml(c.description)}</span>
+            </div>
+            ${badgeHtml(status)}
+          </div>
+          <div class="card-body">
+            <div class="url-row" onclick="showUrl(${c.id})">
+              <span class="url-text">${escHtml(urlShort)}</span>
+              <span class="copy-hint">タップして表示</span>
+            </div>
+            <div class="meta-row">
+              <span><strong>有効期限：</strong>${expiresLabel(c)}</span>
+              ${c.used && c.used_at ? `<span><strong>使用日：</strong>${fmtDate(c.used_at.slice(0,10))}</span>` : ''}
+            </div>
+            ${noteHtml}
+          </div>
+          <div class="card-actions">
+            <button class="btn-sm ${usedBtnCls}" onclick="toggleUsed(${c.id})">${usedBtnText}</button>
+            <button class="btn-sm btn-edit" onclick="openEdit(${c.id})">編集</button>
+            <button class="btn-sm btn-del" onclick="deleteCoupon(${c.id})">削除</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function renderSummary() {
+    const counts = { active: 0, expiring: 0, expired: 0, used: 0 };
+    coupons.forEach(c => counts[getStatus(c)]++);
+    document.getElementById('summary').innerHTML = `
+      <div class="summary-card"><div class="num">${coupons.length}</div><div class="label">合計</div></div>
+      <div class="summary-card success"><div class="num">${counts.active}</div><div class="label">有効</div></div>
+      <div class="summary-card warning"><div class="num">${counts.expiring}</div><div class="label">期限間近</div></div>
+      <div class="summary-card danger"><div class="num">${counts.expired}</div><div class="label">期限切れ</div></div>
+      <div class="summary-card"><div class="num">${counts.used}</div><div class="label">使用済み</div></div>
+    `;
+  }
+
+  async function loadCoupons() {
+    const res = await fetch('/api/coupons');
+    coupons = await res.json();
+    renderSummary();
+    renderCards();
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // フィルタ
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentFilter = btn.dataset.filter;
+      renderCards();
+    });
+  });
+
+  // 追加モーダル
+  document.getElementById('addBtn').addEventListener('click', () => {
+    editingId = null;
+    document.getElementById('formTitle').textContent = '株主優待を追加';
+    document.getElementById('fieldCompany').value = '';
+    document.getElementById('fieldDescription').value = '';
+    document.getElementById('fieldUrl').value = '';
+    document.getElementById('fieldExpires').value = '';
+    document.getElementById('fieldNote').value = '';
+    document.getElementById('formModal').classList.add('open');
+  });
+
+  document.getElementById('cancelBtn').addEventListener('click', () => {
+    document.getElementById('formModal').classList.remove('open');
+  });
+
+  document.getElementById('formModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('formModal'))
+      document.getElementById('formModal').classList.remove('open');
+  });
+
+  document.getElementById('saveBtn').addEventListener('click', async () => {
+    const body = {
+      company: document.getElementById('fieldCompany').value.trim(),
+      description: document.getElementById('fieldDescription').value.trim(),
+      url: document.getElementById('fieldUrl').value.trim(),
+      expires_at: document.getElementById('fieldExpires').value,
+      note: document.getElementById('fieldNote').value.trim(),
+    };
+    if (!body.company || !body.description || !body.url || !body.expires_at) {
+      showToast('必須項目を入力してください');
+      return;
+    }
+    const url = editingId ? `/api/coupons/${editingId}` : '/api/coupons';
+    const method = editingId ? 'PUT' : 'POST';
+    const res = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if (res.ok) {
+      document.getElementById('formModal').classList.remove('open');
+      showToast(editingId ? '更新しました' : '追加しました');
+      await loadCoupons();
+    } else {
+      const err = await res.json();
+      showToast(err.error || 'エラーが発生しました');
+    }
+  });
+
+  function openEdit(id) {
+    const c = coupons.find(x => x.id === id);
+    if (!c) return;
+    editingId = id;
+    document.getElementById('formTitle').textContent = '株主優待を編集';
+    document.getElementById('fieldCompany').value = c.company;
+    document.getElementById('fieldDescription').value = c.description;
+    document.getElementById('fieldUrl').value = c.url;
+    document.getElementById('fieldExpires').value = c.expires_at;
+    document.getElementById('fieldNote').value = c.note || '';
+    document.getElementById('formModal').classList.add('open');
+  }
+
+  async function toggleUsed(id) {
+    const res = await fetch(`/api/coupons/${id}/toggle-used`, { method: 'PATCH' });
+    if (res.ok) { await loadCoupons(); }
+  }
+
+  async function deleteCoupon(id) {
+    const c = coupons.find(x => x.id === id);
+    if (!confirm(`「${c.company}」の優待を削除しますか？`)) return;
+    const res = await fetch(`/api/coupons/${id}`, { method: 'DELETE' });
+    if (res.ok) { showToast('削除しました'); await loadCoupons(); }
+  }
+
+  // URL表示モーダル
+  function showUrl(id) {
+    const c = coupons.find(x => x.id === id);
+    if (!c) return;
+    document.getElementById('urlModalTitle').textContent = `${c.company} の優待URL`;
+    document.getElementById('urlModalContent').textContent = c.url;
+    document.getElementById('urlModalOpen').href = c.url;
+    document.getElementById('urlModal').classList.add('open');
+  }
+
+  document.getElementById('urlModalClose').addEventListener('click', () => {
+    document.getElementById('urlModal').classList.remove('open');
+  });
+  document.getElementById('urlModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('urlModal'))
+      document.getElementById('urlModal').classList.remove('open');
+  });
+  document.getElementById('urlModalCopy').addEventListener('click', () => {
+    const url = document.getElementById('urlModalContent').textContent;
+    navigator.clipboard.writeText(url).then(() => showToast('URLをコピーしました'));
+  });
+
+  // トースト
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  loadCoupons();
+</script>
+</body>
+</html>
