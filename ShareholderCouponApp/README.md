@@ -119,37 +119,149 @@ SESSION_SECRET=ランダムな長い文字列
 
 ## APIリファレンス
 
-### 公開エンドポイント（認証不要）
+### 共通エラーレスポンス
 
-| メソッド | パス | 説明 | レスポンス例 |
-|---------|------|------|-------------|
-| `GET` | `/login` | ログイン画面を表示 | HTML |
-| `GET` | `/simplewebauthn-browser.js` | WebAuthn ブラウザライブラリ配信 | JavaScript |
-| `GET` | `/api/auth/has-credentials` | パスキー登録済みか確認 | `{ "hasCredentials": false }` |
-| `GET` | `/api/auth/status` | 現在の認証状態を確認 | `{ "authenticated": false }` |
-| `POST` | `/api/auth/register/options` | パスキー登録オプションを生成 | WebAuthn PublicKeyCredentialCreationOptions |
-| `POST` | `/api/auth/register/verify` | パスキー登録を検証・セッション開始 | `{ "verified": true }` |
-| `POST` | `/api/auth/authenticate/options` | パスキー認証オプションを生成 | WebAuthn PublicKeyCredentialRequestOptions |
-| `POST` | `/api/auth/authenticate/verify` | パスキー認証を検証・セッション開始 | `{ "verified": true }` |
+すべての API エンドポイントで発生しうるエラーは以下の形式で返されます。
 
-### 保護エンドポイント（認証必須）
+```json
+{ "error": "エラーメッセージ" }
+```
 
-| メソッド | パス | 説明 | レスポンス例 |
-|---------|------|------|-------------|
-| `GET` | `/` | メイン画面を表示 | HTML |
-| `POST` | `/api/auth/logout` | ログアウト（セッション破棄） | `{ "success": true }` |
+| ステータス | 発生条件 |
+|-----------|---------|
+| `400 Bad Request` | バリデーションエラー・WebAuthn 検証失敗 |
+| `401 Unauthorized` | 未認証状態で保護エンドポイントにアクセス |
+| `404 Not Found` | 対象リソースが存在しない |
+| `500 Internal Server Error` | サーバー内部エラー（WebAuthn 処理失敗など） |
+
+`401` の場合はリダイレクト先も含まれます:
+```json
+{ "error": "認証が必要です", "redirect": "/login" }
+```
+
+---
+
+### 認証 API（認証不要）
+
+#### GET `/api/auth/has-credentials`
+
+パスキーが登録済みかどうかを確認します。
+
+**レスポンス**
+```json
+{ "hasCredentials": false }
+```
+
+---
+
+#### GET `/api/auth/status`
+
+現在のセッションの認証状態を返します。
+
+**レスポンス**
+```json
+{ "authenticated": true }
+```
+
+---
+
+#### POST `/api/auth/register/options`
+
+パスキー登録用の WebAuthn チャレンジを生成します。生成されたチャレンジはセッションに保存されます。
+
+**レスポンス**: WebAuthn `PublicKeyCredentialCreationOptions`（`@simplewebauthn/browser` の `startRegistration()` にそのまま渡す）
+
+**エラー**
+
+| ステータス | 説明 |
+|-----------|------|
+| `500` | オプション生成に失敗した場合 |
+
+---
+
+#### POST `/api/auth/register/verify`
+
+`startRegistration()` の戻り値を送信し、パスキー登録を完了します。
+
+**リクエストボディ**: `startRegistration()` の戻り値をそのまま送信
+
+**レスポンス**
+```json
+{ "verified": true }
+```
+
+成功するとセッションが認証済み状態（`authenticated: true`）になります。
+
+**エラー**
+
+| ステータス | 説明 |
+|-----------|------|
+| `400` | チャレンジ不一致・署名検証失敗・オリジン不一致 |
+| `500` | 検証処理中のサーバーエラー |
+
+---
+
+#### POST `/api/auth/authenticate/options`
+
+パスキー認証用の WebAuthn チャレンジを生成します。
+
+**レスポンス**: WebAuthn `PublicKeyCredentialRequestOptions`（`startAuthentication()` にそのまま渡す）
+
+**エラー**
+
+| ステータス | 説明 |
+|-----------|------|
+| `500` | オプション生成に失敗した場合 |
+
+---
+
+#### POST `/api/auth/authenticate/verify`
+
+`startAuthentication()` の戻り値を送信し、認証を完了します。
+
+**リクエストボディ**: `startAuthentication()` の戻り値をそのまま送信
+
+**レスポンス**
+```json
+{ "verified": true }
+```
+
+成功するとセッションが認証済み状態になり、クレデンシャルのカウンターが更新されます。
+
+**エラー**
+
+| ステータス | 説明 |
+|-----------|------|
+| `400` | チャレンジ不一致・署名検証失敗・カウンター異常（リプレイ攻撃の可能性） |
+| `404` | 送信されたクレデンシャル ID が DB に存在しない |
+| `500` | 検証処理中のサーバーエラー |
+
+---
+
+#### POST `/api/auth/logout`
+
+セッションを破棄してログアウトします。（要認証）
+
+**レスポンス**
+```json
+{ "success": true }
+```
+
+---
+
+### メイン画面（認証必須）
+
+| メソッド | パス | 説明 |
+|---------|------|------|
+| `GET` | `/` | メイン画面を返す。未認証の場合は `/login` にリダイレクト |
 
 ### クーポン管理 API（認証必須）
 
-#### 一覧取得
-
-```
-GET /api/coupons
-```
+#### GET `/api/coupons` — 一覧取得
 
 有効期限の昇順で全クーポンを返します。
 
-**レスポンス例:**
+**レスポンス** `200 OK`
 ```json
 [
   {
@@ -168,61 +280,82 @@ GET /api/coupons
 ]
 ```
 
-#### 登録
+**エラー**
 
-```
-POST /api/coupons
-Content-Type: application/json
-```
+| ステータス | 説明 |
+|-----------|------|
+| `401` | 未認証 |
 
-**リクエストボディ:**
+---
+
+#### POST `/api/coupons` — 登録
+
+**リクエストボディ**
+
+| フィールド | 型 | 必須 | 説明 |
+|-----------|-----|-----|------|
+| `company` | string | ✅ | 会社名 |
+| `description` | string | ✅ | 優待内容 |
+| `url` | string | ✅ | クーポンURL |
+| `expires_at` | string | ✅ | 有効期限（YYYY-MM-DD） |
+| `note` | string | — | メモ |
+| `shareholder_number` | string | — | 株主番号 |
+| `securities_code` | string | — | 証券コード |
+
+**レスポンス** `201 Created` — 作成されたクーポンオブジェクト
+
+**エラー**
+
+| ステータス | 説明 |
+|-----------|------|
+| `400` | `company` / `description` / `url` / `expires_at` のいずれかが未指定 |
+| `401` | 未認証 |
+
+---
+
+#### PUT `/api/coupons/:id` — 編集
+
+リクエストボディは登録と同様（全フィールドを送信）。
+
+**レスポンス** `200 OK` — 更新後のクーポンオブジェクト
+
+**エラー**
+
+| ステータス | 説明 |
+|-----------|------|
+| `400` | 必須フィールドが未指定 |
+| `401` | 未認証 |
+
+---
+
+#### PATCH `/api/coupons/:id/toggle-used` — 使用済みトグル
+
+`used` フラグを `0` ↔ `1` で切り替えます。`1` になるとき `used_at` に現在時刻を記録し、`0` に戻すと `used_at` は `null` になります。
+
+**レスポンス** `200 OK` — 更新後のクーポンオブジェクト
+
+**エラー**
+
+| ステータス | 説明 |
+|-----------|------|
+| `401` | 未認証 |
+| `404` | 指定した `id` のクーポンが存在しない |
+
+---
+
+#### DELETE `/api/coupons/:id` — 削除
+
+**レスポンス** `200 OK`
 ```json
-{
-  "company": "○○ホールディングス",
-  "description": "オンラインショップ 1,000円割引",
-  "url": "https://example.com/coupon/abc123",
-  "expires_at": "2026-06-30",
-  "note": "5,000円以上で利用可",
-  "shareholder_number": "SH-001234",
-  "securities_code": "1234"
-}
+{ "success": true }
 ```
 
-`company` / `description` / `url` / `expires_at` は必須です。
-成功時: `201 Created` + 作成されたクーポンオブジェクト
+**エラー**
 
-#### 編集
-
-```
-PUT /api/coupons/:id
-Content-Type: application/json
-```
-
-リクエストボディは登録と同様。成功時: `200 OK` + 更新後のクーポンオブジェクト
-
-#### 使用済みトグル
-
-```
-PATCH /api/coupons/:id/toggle-used
-```
-
-`used` フラグを `0` ↔ `1` で切り替えます。`used` が `1` になる際に `used_at` を記録します。
-
-#### 削除
-
-```
-DELETE /api/coupons/:id
-```
-
-成功時: `{ "success": true }`
-
-#### エラーレスポンス
-
-| ステータス | 例 |
-|-----------|-----|
-| `400 Bad Request` | `{ "error": "必須項目が不足しています" }` |
-| `401 Unauthorized` | `{ "error": "認証が必要です", "redirect": "/login" }` |
-| `404 Not Found` | `{ "error": "見つかりません" }` |
+| ステータス | 説明 |
+|-----------|------|
+| `401` | 未認証 |
+| `404` | 指定した `id` のクーポンが存在しない |
 
 ## データベース設計
 
