@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ログイン | 株主優待 URL管理</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Hiragino Sans', 'Meiryo', sans-serif;
+      background: #f4f6f9;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #1a3a5c;
+      color: white;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { font-size: 1.25rem; font-weight: 700; }
+
+    .main {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.12);
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+
+    .icon { font-size: 3rem; margin-bottom: 16px; }
+
+    .card h2 {
+      font-size: 1.3rem;
+      color: #1a3a5c;
+      margin-bottom: 8px;
+    }
+
+    .card p {
+      font-size: .9rem;
+      color: #718096;
+      margin-bottom: 28px;
+      line-height: 1.6;
+    }
+
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      padding: 14px 20px;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .15s;
+      margin-bottom: 12px;
+    }
+
+    .btn-primary {
+      background: #2b6cb0;
+      color: white;
+    }
+    .btn-primary:hover { background: #2c5282; }
+    .btn-primary:disabled { background: #a0aec0; cursor: not-allowed; }
+
+    .btn-secondary {
+      background: #edf2f7;
+      color: #4a5568;
+      font-size: .875rem;
+      font-weight: 600;
+      padding: 10px 20px;
+    }
+    .btn-secondary:hover { background: #e2e8f0; }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 16px 0;
+      color: #a0aec0;
+      font-size: .8rem;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #e2e8f0;
+    }
+
+    .error-msg {
+      background: #fff5f5;
+      border: 1px solid #feb2b2;
+      color: #c53030;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: .85rem;
+      margin-top: 12px;
+      display: none;
+    }
+    .error-msg.show { display: block; }
+
+    .success-msg {
+      background: #f0fff4;
+      border: 1px solid #9ae6b4;
+      color: #276749;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: .85rem;
+      margin-top: 12px;
+      display: none;
+    }
+    .success-msg.show { display: block; }
+
+    .note {
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid #e2e8f0;
+      font-size: .8rem;
+      color: #a0aec0;
+      line-height: 1.6;
+    }
+
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2.5px solid rgba(255,255,255,.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading .spinner { display: block; }
+    .loading .btn-text { display: none; }
+  </style>
+</head>
+<body>
+<header>
+  <span>📊</span>
+  <h1>株主優待 URL管理</h1>
+</header>
+
+<div class="main">
+  <div class="card" id="loginCard">
+    <!-- JS で内容を動的に切り替え -->
+    <div class="icon">🔐</div>
+    <h2>読み込み中...</h2>
+  </div>
+</div>
+
+<script src="/simplewebauthn-browser.js"></script>
+<script>
+  const { startRegistration, startAuthentication } = SimpleWebAuthnBrowser;
+
+  async function init() {
+    const { hasCredentials } = await fetch('/api/auth/has-credentials').then(r => r.json());
+    renderCard(hasCredentials);
+  }
+
+  function renderCard(hasCredentials) {
+    const card = document.getElementById('loginCard');
+
+    if (!hasCredentials) {
+      card.innerHTML = `
+        <div class="icon">🔑</div>
+        <h2>初回設定</h2>
+        <p>このデバイスでパスキーを登録して<br>アプリにアクセスできるようにします。<br>生体認証（指紋・顔認証）を使用します。</p>
+        <button class="btn btn-primary" id="registerBtn" onclick="doRegister()">
+          <div class="spinner"></div>
+          <span class="btn-text">📲 パスキーを登録する</span>
+        </button>
+        <div class="error-msg" id="errorMsg"></div>
+        <div class="note">パスキーはこのデバイスにのみ保存されます。<br>パスワードは不要です。</div>
+      `;
+    } else {
+      card.innerHTML = `
+        <div class="icon">👆</div>
+        <h2>ログイン</h2>
+        <p>登録済みのパスキーで<br>認証してください。</p>
+        <button class="btn btn-primary" id="loginBtn" onclick="doAuthenticate()">
+          <div class="spinner"></div>
+          <span class="btn-text">🔓 パスキーでログイン</span>
+        </button>
+        <div class="error-msg" id="errorMsg"></div>
+        <div class="divider">または</div>
+        <button class="btn btn-secondary" onclick="doRegister()">
+          <span class="btn-text">＋ 新しいパスキーを追加</span>
+        </button>
+        <div class="success-msg" id="successMsg"></div>
+        <div class="note">生体認証（指紋・顔認証）を使用します。<br>別のデバイスで使う場合は新しいパスキーを追加してください。</div>
+      `;
+    }
+  }
+
+  function setLoading(btnId, loading) {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    if (loading) btn.classList.add('loading');
+    else btn.classList.remove('loading');
+    btn.disabled = loading;
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('errorMsg');
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.add('show');
+  }
+
+  function showSuccess(msg) {
+    const el = document.getElementById('successMsg');
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.add('show');
+  }
+
+  async function doRegister() {
+    const btnId = 'registerBtn';
+    setLoading(btnId, true);
+    const errEl = document.getElementById('errorMsg');
+    if (errEl) errEl.classList.remove('show');
+
+    try {
+      const optRes = await fetch('/api/auth/register/options', { method: 'POST' });
+      const options = await optRes.json();
+      if (!optRes.ok) throw new Error(options.error || '登録オプションの取得に失敗しました');
+
+      const regResponse = await startRegistration({ optionsJSON: options });
+
+      const verRes = await fetch('/api/auth/register/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(regResponse),
+      });
+      const result = await verRes.json();
+      if (!verRes.ok) throw new Error(result.error || '登録の検証に失敗しました');
+
+      showSuccess && showSuccess('パスキーを登録しました');
+      setTimeout(() => { window.location.href = '/'; }, 800);
+    } catch (e) {
+      if (e.name !== 'NotAllowedError') {
+        showError(e.message || 'パスキーの登録に失敗しました');
+      }
+      setLoading(btnId, false);
+    }
+  }
+
+  async function doAuthenticate() {
+    const btnId = 'loginBtn';
+    setLoading(btnId, true);
+    const errEl = document.getElementById('errorMsg');
+    if (errEl) errEl.classList.remove('show');
+
+    try {
+      const optRes = await fetch('/api/auth/authenticate/options', { method: 'POST' });
+      const options = await optRes.json();
+      if (!optRes.ok) throw new Error(options.error || '認証オプションの取得に失敗しました');
+
+      const authResponse = await startAuthentication({ optionsJSON: options });
+
+      const verRes = await fetch('/api/auth/authenticate/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(authResponse),
+      });
+      const result = await verRes.json();
+      if (!verRes.ok) throw new Error(result.error || '認証の検証に失敗しました');
+
+      window.location.href = '/';
+    } catch (e) {
+      if (e.name !== 'NotAllowedError') {
+        showError(e.message || 'パスキーの認証に失敗しました');
+      }
+      setLoading(btnId, false);
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>
